@@ -1,6 +1,7 @@
 <p align="center"><img src="https://raw.githubusercontent.com/nathanrooy/p-area/main/logo/logo.png"></p>
 
 [![gh-actions-ci](https://img.shields.io/github/workflow/status/nathanrooy/p-area/ci?style=flat-square)](https://github.com/nathanrooy/p-area/actions?query=workflow%3Aci)
+[![GitHub license](https://img.shields.io/github/license/nathanrooy/p-area?style=flat-square)](https://github.com/nathanrooy/p-area/blob/master/LICENSE)
 
 Most <a target="_blank" href="https://en.wikipedia.org/wiki/Lift_coefficient">lift</a> and <a target="_blank" href="https://en.wikipedia.org/wiki/Drag_coefficient">drag</a> calculations require the use of a frontal/projected area. This is normally not that big of a deal, especially when dealing with nice clean CAD files. Unfortunately, in fast-paced design environments (motorsport especially), you'll often get a collection of <a target="_blank" href="https://en.wikipedia.org/wiki/STL_(file_format)">STL</a> geometry files instead. This is annoying for a number of reasons, but mainly because there are several methods for computing the frontal area of an STL and all of them involve a fairly tedious/lengthy process. pArea aims to solve this with a single command.
 
