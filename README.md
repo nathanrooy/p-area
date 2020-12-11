@@ -1,4 +1,4 @@
-<p align="center"><img src="https://raw.githubusercontent.com/nathanrooy/p-area/main/logo/logo.png"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/nathanrooy/p-area/main/logo/logo.png" width="50%"></p>
 
 [![gh-actions-ci](https://img.shields.io/github/workflow/status/nathanrooy/p-area/ci?style=flat-square)](https://github.com/nathanrooy/p-area/actions?query=workflow%3Aci)
 [![GitHub license](https://img.shields.io/github/license/nathanrooy/p-area?style=flat-square)](https://github.com/nathanrooy/p-area/blob/master/LICENSE)
