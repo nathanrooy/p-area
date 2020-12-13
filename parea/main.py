@@ -1,5 +1,4 @@
 import argparse
-import glob
 
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
