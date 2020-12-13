@@ -12,10 +12,20 @@ Most <a target="_blank" href="https://en.wikipedia.org/wiki/Lift_coefficient">li
 ```pip install parea```
 
 ### Usage
-As a simple example, the <a target="_blank" href="https://github.com/nathanrooy/p-area/blob/main/tests/cube.stl">cube</a> STL located within the `tests` directory has a projected area of 4.0 along all three coordinate axes. To validate this, simply run the following (assuming you've downloaded cube.stl into your current working directory):
+As a simple example, the <a target="_blank" href="https://github.com/nathanrooy/p-area/blob/main/tests/data/cube_ascii.stl">cube</a> STL located within the `tests` directory has a projected area of 4.0 along all three coordinate axes. To validate this, simply run the following (assuming you've downloaded cube_ascii.stl into your current working directory):
 
 ```python
-parea -stl cube.stl -x
+parea -stl cube_ascii.stl -x
+```
+
+For models comprised of multiple STL files, simply separate the file names with a space:
+```python
+parea -stl file_1.stl file_2.stl file_3.stl -x
+```
+
+Or use shell-style wildcards:
+```python
+parea -stl file_*.stl  -x
 ```
 
 ### Options
