@@ -1,4 +1,5 @@
 import argparse
+import glob
 
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
@@ -135,15 +136,33 @@ def _load_stl_generator(stl_path):
                     tblock = False
 
 
-def _calculate_projected_area(args):
-    # bulk load all triangles from stl
-    triangles = _bulk_load_stl(args.stl_path, args.vec)
+def _calculate_projected_area(stl_paths, pvec):
+    '''CALCULATE PROJECTED AREA
 
-    # merge triangles into single polygon
-    main_poly = unary_union(triangles)
+    Parameters
+    ----------
+    stl_paths : list
+    pvec : str
 
-    # return results
-    return main_poly.area
+    Returns
+    -------
+    float
+    '''
+
+    sub_polys = []
+    for stl_file in stl_paths:
+
+        # bulk load all triangles from stl
+        triangles = _bulk_load_stl(stl_file, pvec)
+
+        # merge triangles into single polygon
+        sub_poly = unary_union(triangles)
+
+        # persist sub poly
+        sub_polys.append(sub_poly)
+
+    # return just the projected area
+    return unary_union(sub_polys).area
 
 
 #--- MAIN ---------------------------------------------------------------------+
@@ -152,30 +171,30 @@ def _calculate_projected_area(args):
 def main():
     # parse arguments
     parser = argparse.ArgumentParser(description='--- pArea ---')
-    parser.add_argument('-stl', dest='stl_path', type=str, required=True, help='specify the path to the stl')
+    parser.add_argument('-stl', nargs='+', dest='stl_paths', type=str, required=True, help='specify the path to the stl')
 
     # vectors
-    parser.add_argument('-x', dest='vec', required=False, action='store_const', const='x')
-    parser.add_argument('-y', dest='vec', required=False, action='store_const', const='y')
-    parser.add_argument('-z', dest='vec', required=False, action='store_const', const='z')
+    parser.add_argument('-x', dest='pvec', required=False, action='store_const', const='x')
+    parser.add_argument('-y', dest='pvec', required=False, action='store_const', const='y')
+    parser.add_argument('-z', dest='pvec', required=False, action='store_const', const='z')
 
     # planes
-    parser.add_argument('-xy', dest='vec', required=False, action='store_const', const='z')
-    parser.add_argument('-yz', dest='vec', required=False, action='store_const', const='x')
-    parser.add_argument('-zx', dest='vec', required=False, action='store_const', const='y')
+    parser.add_argument('-xy', dest='pvec', required=False, action='store_const', const='z')
+    parser.add_argument('-yz', dest='pvec', required=False, action='store_const', const='x')
+    parser.add_argument('-zx', dest='pvec', required=False, action='store_const', const='y')
 
     # more planes
-    parser.add_argument('-yx', dest='vec', required=False, action='store_const', const='z')
-    parser.add_argument('-zy', dest='vec', required=False, action='store_const', const='x')
-    parser.add_argument('-xz', dest='vec', required=False, action='store_const', const='y')
+    parser.add_argument('-yx', dest='pvec', required=False, action='store_const', const='z')
+    parser.add_argument('-zy', dest='pvec', required=False, action='store_const', const='x')
+    parser.add_argument('-xz', dest='pvec', required=False, action='store_const', const='y')
 
     args = parser.parse_args()
 
     # basic checks
-    if args.stl_path is None: print('ERROR: must specify an stl path')
+    if args.stl_paths is None: print('ERROR: must specify an stl path')
 
     # calculate projected area
-    p_area = _calculate_projected_area(args)
+    p_area = _calculate_projected_area(args.stl_paths, args.pvec)
 
     # display results
     print(f'> projected area: {p_area}')
