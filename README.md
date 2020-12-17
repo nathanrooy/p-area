@@ -9,30 +9,40 @@ Most <a target="_blank" href="https://en.wikipedia.org/wiki/Lift_coefficient">li
 
 
 ### Installation
-```pip install parea```
+```
+pip install parea
+```
 
 ### Usage
 As a simple example, the <a target="_blank" href="https://github.com/nathanrooy/p-area/blob/main/tests/data/cube_ascii.stl">cube</a> STL located within the `tests` directory has a projected area of 4.0 along all three coordinate axes. To validate this, simply run the following (assuming you've downloaded cube_ascii.stl into your current working directory):
 
-```python
+```
 parea -stl cube_ascii.stl -x
 ```
 
 For models comprised of multiple STL files, simply separate the file names with a space:
-```python
+
+```
 parea -stl file_1.stl file_2.stl file_3.stl -x
 ```
 
 Or use shell-style wildcards:
-```python
+
+```
 parea -stl file_*.stl  -x
 ```
+
+When simulating ground vehicles with non-rigid wheels, you will need to account for the tire deformation and subsequent ride height drop. This can be facilitated using the `-floor` flag followed by a floor height float value. Note that floor height is in reference to the vertical axis of the specified projection plane.
+
+```
+parea -stl file_*.stl  -x -floor 0.0125
+```
+Since the projection vector is `x`, our projection plane is therefore `yz` yielding a projected area based off all geometry above z=0.0125.
 
 ### Options
 vectors: `-x`, `-y`, `-z`
 
 planes: `-yz`/`-zy`, `-xz`/`-zx`, `-xy`/`-yx`
-
 
 ### References
 - Computational Geometry: Algorithms and Applications (3rd Edition) by Mike de Borg, Otfried Cheong, Mark van Kreveld, and Mark Overmars
