@@ -33,12 +33,12 @@ Or use shell-style wildcards:
 parea -stl file_*.stl  -x
 ```
 
-When simulating ground vehicles with non-rigid wheels, you will need to account for the tire deformation and subsequent ride height drop. This can be facilitated using the `-floor` flag followed by a floor height float value. Note that floor height is in reference to the vertical axis of the specified projection plane.
+When simulating ground vehicles with non-rigid wheels, you will need to account for the tire deformation and subsequent ride height drop. This can be accounted for by using the `-floor` flag followed by a floor height value. Note that floor height is in reference to the vertical axis of the specified projection plane and maintains the same units as the STL file. As an example:
 
 ```
 parea -stl file_*.stl  -x -floor 0.0125
 ```
-Since the projection vector is `x`, our projection plane is therefore `yz` yielding a projected area based off all geometry above z=0.0125.
+Since the projection vector is `x`, our projection plane is therefore `yz` yielding a projected area based off all geometry <b>above</b> z=0.0125.
 
 ### Options
 vectors: `-x`, `-y`, `-z`
