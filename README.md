@@ -38,7 +38,7 @@ When simulating ground vehicles with non-rigid wheels, you will need to account 
 ```
 parea -stl file_*.stl  -x -floor 0.0125
 ```
-Since the projection vector is `x`, our projection plane is therefore `yz` yielding a projected area based off all geometry <b>above</b> z=0.0125.
+Since the projection vector is `x`, our projection plane is therefore `yz` yielding a projected area based off all geometry <b>above</b> z>=0.0125. All geometry below the horizontal line z=0.0125 is accordingly clipped and removed from the calculation.
 
 ### Options
 vectors: `-x`, `-y`, `-z`
