@@ -49,4 +49,5 @@ planes: `-yz`/`-zy`, `-xz`/`-zx`, `-xy`/`-yx`
 - Computational Geometry: Algorithms and Applications (3rd Edition) by Mike de Borg, Otfried Cheong, Mark van Kreveld, and Mark Overmars
 - Computational Geometry in C (2nd Edition) by Joseph O'Rourke
 - Finite Element Mesh Generation by Daniel S.H. Lo
+- Command Line Interface Guidelines [<a href="https://github.com/cli-guidelines/cli-guidelines">link</a>]
 
