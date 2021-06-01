@@ -37,7 +37,7 @@ def _area2(a, b, c):
 def _munge_triangle(v1, v2, v3, min_area=0):
     '''MUNGE TRIANGLE
     
-    For every new triangle that get's added, it  needs to pass some basic 
+    For every new triangle that gets added, it  needs to pass some basic 
     quality controls and if need be, fixed.
     
     1) Triangles with zero area are automatically rejected.
