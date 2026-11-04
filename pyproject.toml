@@ -33,6 +33,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
 ]
 dependencies = [
     "numpy>=1.24",
@@ -50,5 +51,34 @@ parea = "parea:main"
 [tool.setuptools.packages.find]
 include = ["parea*"]
 
+[tool.setuptools.package-data]
+parea = ["py.typed"]
+
 [tool.setuptools.dynamic]
 version = { attr = "parea.__about__.__version__" }
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "NPY", # NumPy-specific rules
+    "RUF", # Ruff-specific rules
+]
+
+[tool.mypy]
+warn_unused_configs = true
+check_untyped_defs = true
+disallow_incomplete_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+ignore_missing_imports = true
