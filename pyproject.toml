@@ -92,15 +92,19 @@ warn_unused_ignores = true
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
+pythonpath = ["."]
 testpaths = ["tests"]
 python_files = ["test_*.py", "unit.py", "integration.py"]
-python_classes = ["Test*", "test_*"]
 addopts = "-ra --strict-markers"
 
 [tool.coverage.run]
 source = ["parea"]
+omit = ["parea/__main__.py"]
 branch = true
 
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
+exclude_also = [
+    "if __name__ == .__main__.:",
+]

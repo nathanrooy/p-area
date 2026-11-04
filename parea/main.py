@@ -255,8 +255,6 @@ def calculate_projected_area(
     # clip using floor height if necessary
     if floor_val is not None:
         u_min, v_min, u_max, v_max = p_proj.bounds
-        if floor_val >= v_max:
-            return 0.0
         if floor_val > v_min:
             p_proj = shapely.clip_by_rect(p_proj, u_min, floor_val, u_max, v_max)
 
