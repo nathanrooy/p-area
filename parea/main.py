@@ -4,10 +4,13 @@ import argparse
 import os
 import struct
 from collections.abc import Sequence
+from pathlib import Path
 
 import numpy as np
 import shapely
 from numpy.typing import ArrayLike, NDArray
+
+from parea.__about__ import __version__
 
 # --- constants ---------------------------------------------------------------+
 
@@ -84,11 +87,6 @@ def _munge_triangle(pts_2d: ArrayLike, min_area: float = 0.0) -> NDArray[np.floa
     return pts
 
 
-def _project_point_to_plane(v: ArrayLike, vec: str) -> None:
-    """PROJECT POINT TO PLANE"""
-    pass
-
-
 def _project_triangle_to_plane(tris_3d: ArrayLike, vec: str) -> NDArray[np.float64]:
     """Project 3D triangle vertices onto an axis-aligned 2D plane.
 
@@ -124,7 +122,7 @@ def _read_ascii(stl_path: PathLikeStr, n_tris: int | None = None) -> NDArray[np.
         triangle vertices array with shape (n_tris, 3, 3) and dtype float64
     """
     triangles: list[list[list[float]]] = []
-    with open(stl_path) as stl_file:
+    with Path(stl_path).open("r", encoding="utf-8", errors="replace") as stl_file:
         triangle: list[list[float]] = []
         tblock = False
 
@@ -155,11 +153,12 @@ def _is_binary_stl(stl_path: PathLikeStr) -> bool:
     -------
     bool
     """
-    file_size = os.path.getsize(stl_path)
+    path = Path(stl_path)
+    file_size = path.stat().st_size
     if file_size < 84:
         return False
 
-    with open(stl_path, "rb") as f:
+    with path.open("rb") as f:
         f.seek(80)
         n_tris: int = struct.unpack("<I", f.read(4))[0]
 
@@ -217,16 +216,16 @@ def _load_stl(
     return np.asarray(shapely.polygons(verts_2d), dtype=object)
 
 
-def _calculate_projected_area(
-    stl_paths: Sequence[PathLikeStr],
+def calculate_projected_area(
+    stl_paths: Sequence[PathLikeStr] | PathLikeStr,
     pvec: str,
-    fheight: float | str | None,
+    fheight: float | str | None = None,
 ) -> float:
-    """CALCULATE PROJECTED AREA
+    """Calculate the projected/frontal area of one or more STL files.
 
     Parameters
     ----------
-    stl_paths : list
+    stl_paths : str, os.PathLike, or sequence of (str or os.PathLike)
     pvec : str
     fheight : float or str, optional
 
@@ -234,11 +233,12 @@ def _calculate_projected_area(
     -------
     float
     """
+    paths = [stl_paths] if isinstance(stl_paths, (str, os.PathLike)) else list(stl_paths)
     floor_val = float(fheight) if fheight is not None else None
 
     # cycle through all stls
     sub_polys = []
-    for stl_file in stl_paths:
+    for stl_file in paths:
         # bulk load all triangles from stl
         triangles = _load_stl(stl_file, pvec, floor_val)
 
@@ -266,11 +266,18 @@ def _calculate_projected_area(
 # --- MAIN --------------------------------------------------------------------+
 
 
-def main() -> None:
-    # parse arguments
+def main(argv: Sequence[str] | None = None) -> None:
+    """CLI entry point for pArea."""
     parser = argparse.ArgumentParser(description="--- pArea ---")
     parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
+    parser.add_argument(
         "-stl",
+        "--stl",
         nargs="+",
         dest="stl_paths",
         type=str,
@@ -279,35 +286,34 @@ def main() -> None:
     )
     parser.add_argument(
         "-floor",
+        "--floor",
         dest="fheight",
         type=float,
         required=False,
         help="specify the floor height. everything below will be clipped.",
     )
 
+    direction = parser.add_mutually_exclusive_group(required=True)
+
     # vectors
-    parser.add_argument("-x", dest="pvec", required=False, action="store_const", const="x")
-    parser.add_argument("-y", dest="pvec", required=False, action="store_const", const="y")
-    parser.add_argument("-z", dest="pvec", required=False, action="store_const", const="z")
+    direction.add_argument("-x", dest="pvec", action="store_const", const="x")
+    direction.add_argument("-y", dest="pvec", action="store_const", const="y")
+    direction.add_argument("-z", dest="pvec", action="store_const", const="z")
 
     # planes
-    parser.add_argument("-xy", dest="pvec", required=False, action="store_const", const="z")
-    parser.add_argument("-yz", dest="pvec", required=False, action="store_const", const="x")
-    parser.add_argument("-zx", dest="pvec", required=False, action="store_const", const="y")
+    direction.add_argument("-xy", "--xy", dest="pvec", action="store_const", const="z")
+    direction.add_argument("-yz", "--yz", dest="pvec", action="store_const", const="x")
+    direction.add_argument("-zx", "--zx", dest="pvec", action="store_const", const="y")
 
     # more planes
-    parser.add_argument("-yx", dest="pvec", required=False, action="store_const", const="z")
-    parser.add_argument("-zy", dest="pvec", required=False, action="store_const", const="x")
-    parser.add_argument("-xz", dest="pvec", required=False, action="store_const", const="y")
+    direction.add_argument("-yx", "--yx", dest="pvec", action="store_const", const="z")
+    direction.add_argument("-zy", "--zy", dest="pvec", action="store_const", const="x")
+    direction.add_argument("-xz", "--xz", dest="pvec", action="store_const", const="y")
 
-    args = parser.parse_args()
-
-    # basic checks
-    if args.stl_paths is None:
-        print("ERROR: must specify an stl path")
+    args = parser.parse_args(argv)
 
     # calculate projected area
-    p_area = _calculate_projected_area(args.stl_paths, args.pvec, args.fheight)
+    p_area = calculate_projected_area(args.stl_paths, args.pvec, args.fheight)
 
     # display results
     if args.fheight is not None:

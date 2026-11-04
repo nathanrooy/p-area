@@ -10,13 +10,13 @@ import numpy as np
 
 from parea.main import (
     _area2,
-    _calculate_projected_area,
     _is_binary_stl,
     _load_stl,
     _munge_triangle,
     _project_triangle_to_plane,
     _read_ascii,
     _read_binary,
+    calculate_projected_area,
 )
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
@@ -73,7 +73,7 @@ class test_main(unittest.TestCase):
             short_ascii.flush()
             self.assertFalse(_is_binary_stl(short_ascii.name))
             self.assertEqual(_read_ascii(short_ascii.name).shape, (0, 3, 3))
-            self.assertEqual(_calculate_projected_area([short_ascii.name], "x", None), 0.0)
+            self.assertEqual(calculate_projected_area([short_ascii.name], "x", None), 0.0)
 
         with tempfile.NamedTemporaryFile(suffix=".stl") as empty_bin:
             empty_bin.write(b"solid_in_header".ljust(80, b"\x00") + struct.pack("<I", 0))
@@ -87,15 +87,15 @@ class test_main(unittest.TestCase):
         self.assertEqual(tris.dtype, np.float64)
 
         for axis in ("x", "y", "z"):
-            area = _calculate_projected_area([CUBE_BINARY_PATH], axis, None)
+            area = calculate_projected_area([CUBE_BINARY_PATH], axis, None)
             self.assertAlmostEqual(area, 4.0, places=5)
 
     def test_floor_precull_and_edge_cases(self) -> None:
         self.assertEqual(len(_load_stl(CUBE_ASCII_PATH, "x", fheight=1.0)), 0)
-        self.assertLess(abs(_calculate_projected_area([CUBE_ASCII_PATH], "x", 0.0) - 2.0), 1e-5)
-        self.assertLess(abs(_calculate_projected_area([CUBE_ASCII_PATH], "x", -2.0) - 4.0), 1e-5)
-        self.assertEqual(_calculate_projected_area([CUBE_ASCII_PATH], "x", 1.0), 0.0)
-        self.assertEqual(_calculate_projected_area([CUBE_ASCII_PATH], "x", 5.0), 0.0)
+        self.assertLess(abs(calculate_projected_area([CUBE_ASCII_PATH], "x", 0.0) - 2.0), 1e-5)
+        self.assertLess(abs(calculate_projected_area([CUBE_ASCII_PATH], "x", -2.0) - 4.0), 1e-5)
+        self.assertEqual(calculate_projected_area([CUBE_ASCII_PATH], "x", 1.0), 0.0)
+        self.assertEqual(calculate_projected_area([CUBE_ASCII_PATH], "x", 5.0), 0.0)
 
 
 if __name__ == "__main__":
