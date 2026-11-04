@@ -12,6 +12,7 @@ from parea.main import (
     _area2,
     _calculate_projected_area,
     _is_binary_stl,
+    _load_stl,
     _munge_triangle,
     _project_triangle_to_plane,
     _read_ascii,
@@ -88,6 +89,13 @@ class test_main(unittest.TestCase):
         for axis in ("x", "y", "z"):
             area = _calculate_projected_area([CUBE_BINARY_PATH], axis, None)
             self.assertAlmostEqual(area, 4.0, places=5)
+
+    def test_floor_precull_and_edge_cases(self) -> None:
+        self.assertEqual(len(_load_stl(CUBE_ASCII_PATH, "x", fheight=1.0)), 0)
+        self.assertLess(abs(_calculate_projected_area([CUBE_ASCII_PATH], "x", 0.0) - 2.0), 1e-5)
+        self.assertLess(abs(_calculate_projected_area([CUBE_ASCII_PATH], "x", -2.0) - 4.0), 1e-5)
+        self.assertEqual(_calculate_projected_area([CUBE_ASCII_PATH], "x", 1.0), 0.0)
+        self.assertEqual(_calculate_projected_area([CUBE_ASCII_PATH], "x", 5.0), 0.0)
 
 
 if __name__ == "__main__":

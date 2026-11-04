@@ -8,7 +8,6 @@ from collections.abc import Sequence
 import numpy as np
 import shapely
 from numpy.typing import ArrayLike, NDArray
-from shapely.geometry import Polygon
 
 # --- constants ---------------------------------------------------------------+
 
@@ -185,13 +184,18 @@ def _read_binary(stl_path: PathLikeStr, n_tris: int | None = None) -> NDArray[np
     return np.asarray(data["vertices"], dtype=np.float64)
 
 
-def _load_stl(stl_path: PathLikeStr, pvec: str) -> NDArray[np.object_]:
+def _load_stl(
+    stl_path: PathLikeStr,
+    pvec: str,
+    fheight: float | None = None,
+) -> NDArray[np.object_]:
     """LOAD STL
 
     Parameters
     ----------
     stl_path : str
     pvec : str
+    fheight : float, optional
 
     Returns
     -------
@@ -205,8 +209,10 @@ def _load_stl(stl_path: PathLikeStr, pvec: str) -> NDArray[np.object_]:
     reader = _read_binary if is_binary else _read_ascii
     tris_3d = reader(stl_path)
 
-    # project, filter, orient CCW, and construct shapely polygons in bulk
+    # project, pre-cull submerged triangles, filter, orient CCW, and construct polygons
     pts_2d = _project_triangle_to_plane(tris_3d, pvec)
+    if fheight is not None:
+        pts_2d = pts_2d[pts_2d[:, :, 1].max(axis=1) > fheight]
     verts_2d = _munge_triangle(pts_2d)
     return np.asarray(shapely.polygons(verts_2d), dtype=object)
 
@@ -222,16 +228,19 @@ def _calculate_projected_area(
     ----------
     stl_paths : list
     pvec : str
+    fheight : float or str, optional
 
     Returns
     -------
     float
     """
+    floor_val = float(fheight) if fheight is not None else None
+
     # cycle through all stls
     sub_polys = []
     for stl_file in stl_paths:
         # bulk load all triangles from stl
-        triangles = _load_stl(stl_file, pvec)
+        triangles = _load_stl(stl_file, pvec, floor_val)
 
         # merge triangles into single polygon
         sub_poly = shapely.union_all(triangles)
@@ -239,23 +248,19 @@ def _calculate_projected_area(
         # persist sub poly
         sub_polys.append(sub_poly)
 
-    # clip using floor height if necessary
-    if fheight:
-        floor_val = float(fheight)
-        p_proj = shapely.union_all(sub_polys)
-        u_min, v_min, u_max, _ = p_proj.bounds
-        p_floor = Polygon(
-            [
-                (u_min - 1, v_min - 1),
-                (u_max + 1, v_min - 1),
-                (u_max + 1, floor_val),
-                (u_min - 1, floor_val),
-            ]
-        )
-        return float(p_proj.difference(p_floor).area)
+    p_proj = shapely.union_all(sub_polys)
+    if p_proj.is_empty:
+        return 0.0
 
-    # return just the projected area
-    return float(shapely.union_all(sub_polys).area)
+    # clip using floor height if necessary
+    if floor_val is not None:
+        u_min, v_min, u_max, v_max = p_proj.bounds
+        if floor_val >= v_max:
+            return 0.0
+        if floor_val > v_min:
+            p_proj = shapely.clip_by_rect(p_proj, u_min, floor_val, u_max, v_max)
+
+    return float(p_proj.area)
 
 
 # --- MAIN --------------------------------------------------------------------+
@@ -275,7 +280,7 @@ def main() -> None:
     parser.add_argument(
         "-floor",
         dest="fheight",
-        type=str,
+        type=float,
         required=False,
         help="specify the floor height. everything below will be clipped.",
     )
@@ -305,7 +310,7 @@ def main() -> None:
     p_area = _calculate_projected_area(args.stl_paths, args.pvec, args.fheight)
 
     # display results
-    if args.fheight:
+    if args.fheight is not None:
         print(">   floor height:", args.fheight)
     print(f"> projected area: {p_area}")
 

@@ -34,8 +34,9 @@ class test_main(unittest.TestCase):
             self.assertLess(abs(_calculate_projected_area(MULTI_STL_PATHS, axis, None) - 3.0), 1e-5)
 
     def test_floor_clipping(self) -> None:
-        self.assertLess(abs(_calculate_projected_area([CUBE_ASCII_PATH], "x", "0.0") - 2.0), 1e-5)
-        self.assertLess(abs(_calculate_projected_area([CUBE_ASCII_PATH], "x", "0.5") - 1.0), 1e-5)
+        self.assertLess(abs(_calculate_projected_area([CUBE_ASCII_PATH], "x", 0.0) - 2.0), 1e-5)
+        self.assertLess(abs(_calculate_projected_area([CUBE_ASCII_PATH], "x", 0.5) - 1.0), 1e-5)
+        self.assertLess(abs(_calculate_projected_area(MULTI_STL_PATHS, "x", 0.0) - 1.5), 1e-5)
 
 
 if __name__ == "__main__":
