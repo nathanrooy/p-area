@@ -46,7 +46,7 @@ jobs:
         run: pytest --cov=parea --cov-report=xml --cov-report=term-missing
       - name: Submit coverage to Codecov
         if: ${{ matrix.python-version == '3.13' }}
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
