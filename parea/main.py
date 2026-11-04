@@ -3,12 +3,16 @@ import os
 import struct
 
 import numpy as np
+import shapely
 from shapely.geometry import Polygon
-from shapely.ops import unary_union
 
 #--- constants ----------------------------------------------------------------+
 
-x, y = [0, 1]
+PLANE_COLS = {
+    'x': [1, 2],
+    'y': [0, 2],
+    'z': [0, 1],
+}
 
 BINARY_STL_DTYPE = np.dtype([
     ('normal', '<f4', (3,)),
@@ -19,68 +23,59 @@ BINARY_STL_DTYPE = np.dtype([
 #--- functions ----------------------------------------------------------------+
 
 
-def _area2(a, b, c):
-    '''Calculate twice the area of a 2D triangle
-    
+def _area2(pts_2d):
+    '''Calculate twice the signed area of 2D triangle(s).
+
     Parameters
     ----------
-    a, b, c : tuple
-        vertex tuples containing two floats (x, y)
-    
+    pts_2d : array_like
+        2D triangle vertices of shape (N, 3, 2) or (3, 2)
+
     Returns
     -------
-    float
-        twice the triangle area
+    numpy.ndarray or float
+        twice the signed triangle area(s)
 
     References
     ----------
-    [1] Computational Geometry in C by Joseph O'Rourke    
+    [1] Computational Geometry in C by Joseph O'Rourke
     '''
+    pts = np.asarray(pts_2d, dtype=np.float64)
     return (
-        (b[x] - a[x]) * (c[y] - a[y]) -
-        (c[x] - a[x]) * (b[y] - a[y]))
+        (pts[..., 1, 0] - pts[..., 0, 0]) * (pts[..., 2, 1] - pts[..., 0, 1]) -
+        (pts[..., 2, 0] - pts[..., 0, 0]) * (pts[..., 1, 1] - pts[..., 0, 1])
+    )
 
 
-def _munge_triangle(v1, v2, v3, min_area=0):
-    '''MUNGE TRIANGLE
-    
-    For every new triangle that gets added, it  needs to pass some basic 
-    quality controls and if need be, fixed.
-    
-    1) Triangles with zero area are automatically rejected.
-    
-    2) Triangles must have three unique vertices.
-    
-    3) All triangles will be returned with a CCW winding regardless of the 
-    winding upon input.
-    
-    4) Final output is a list of three edges, consisting of vertex master list 
-    indices.
-    
-    Inputs
-    ------
-    v1, v2, v3 : tuples
-    
+def _munge_triangle(pts_2d, min_area=0.0):
+    '''Filter degenerate 2D triangles and enforce counter-clockwise (CCW) winding.
+
+    1) Triangles with area <= min_area (including collinear or duplicate vertices)
+       or non-finite coordinates are rejected.
+    2) Clockwise (CW) triangles have their vertex winding reversed to CCW.
+
+    Parameters
+    ----------
+    pts_2d : array_like
+        2D triangle vertices of shape (N, 3, 2) or (3, 2)
+    min_area : float, optional
+
     Returns
     -------
-    t : a list consisting of three edge tuples
+    numpy.ndarray
+        valid CCW 2D triangles of shape (M, 3, 2)
     '''
-    
-    # first check if the triangle has three unique vertices
-    if v1==v2 or v2==v3 or v3==v1: return []
+    pts = np.asarray(pts_2d, dtype=np.float64).reshape(-1, 3, 2)
+    a2 = _area2(pts)
+    valid = np.isfinite(a2) & (np.abs(a2) > 2.0 * min_area)
+    pts = pts[valid]
+    a2 = a2[valid]
 
-    a2 = _area2(v1, v2, v3)
-    
-    # if the triangle has cw winding, reverse the winding order 
-    if a2 < 0: t_verts = [v1, v3, v2]
-    
-    # the winding order is correct, leave vertices alone
-    if a2 > 0: t_verts = [v1, v2, v3]
-        
-    # minimum triangle area check
-    if abs(a2 * 0.5)<=min_area: return []
-        
-    return t_verts
+    cw = a2 < 0.0
+    if np.any(cw):
+        pts[cw] = pts[cw][:, [0, 2, 1]]
+
+    return pts
 
 
 def _project_point_to_plane(v, vec):
@@ -90,47 +85,59 @@ def _project_point_to_plane(v, vec):
     pass
 
 
-def _project_triangle_to_plane(tri_3d, vec):
-    '''PROJECT TRIANGLE TO PLANE
+def _project_triangle_to_plane(tris_3d, vec):
+    '''Project 3D triangle vertices onto an axis-aligned 2D plane.
 
     Parameters
     ----------
-    tri_3d : list
-    
+    tris_3d : array_like
+        3D triangle vertices of shape (N, 3, 3) or (3, 3)
+    vec : str
+        projection axis ('x', 'y', or 'z')
+
     Returns
     -------
-    list
+    numpy.ndarray
+        projected 2D triangle vertices of shape (N, 3, 2)
     '''
-    if vec == 'x': return [(v[1], v[2]) for v in tri_3d]
-    if vec == 'y': return [(v[0], v[2]) for v in tri_3d]
-    if vec == 'z': return [(v[0], v[1]) for v in tri_3d]
+    if vec not in PLANE_COLS:
+        raise ValueError(f"Unsupported projection vector: {vec!r}. Expected 'x', 'y', or 'z'.")
+    tris = np.asarray(tris_3d, dtype=np.float64).reshape(-1, 3, 3)
+    return tris[:, :, PLANE_COLS[vec]]
 
 
 def _read_ascii(stl_path, n_tris=None):
-    '''
-    '''
+    '''Read triangle vertices from an ASCII STL file.
 
+    Parameters
+    ----------
+    stl_path : str or os.PathLike
+    n_tris : int, optional
+
+    Returns
+    -------
+    numpy.ndarray
+        triangle vertices array with shape (n_tris, 3, 3) and dtype float64
+    '''
+    triangles = []
     with open(stl_path, 'r') as stl_file:
-
-        # initialize
         triangle = []
         tblock = False
 
-        # cycle through stl line by line
-        for i, line in enumerate(stl_file.readlines()):
-
-            # begin triangle
-            if 'facet normal' in line: tblock = True
-            if 'vertex' in line and tblock==True: 
-                xyz = line.replace('vertex','').split()
-                x, y, z = float(xyz[0]), float(xyz[1]), float(xyz[2])
-                triangle.append([x, y, z])
-
-            # end triangle block
-            if 'endfacet' in line: 
-                yield triangle
+        for line in stl_file:
+            if 'facet normal' in line:
+                tblock = True
+            if 'vertex' in line and tblock:
+                xyz = line.replace('vertex', '').split()
+                triangle.append([float(xyz[0]), float(xyz[1]), float(xyz[2])])
+            if 'endfacet' in line:
+                triangles.append(triangle)
                 triangle = []
                 tblock = False
+
+    if not triangles:
+        return np.empty((0, 3, 3), dtype=np.float64)
+    return np.asarray(triangles, dtype=np.float64)
 
 
 def _is_binary_stl(stl_path):
@@ -183,24 +190,21 @@ def _load_stl(stl_path, pvec):
 
     Returns
     -------
-    list of shapely polygon objects
+    numpy.ndarray
+        1D array of shapely polygon objects
     '''
 
     # first check if the file is binary
     is_binary = _is_binary_stl(stl_path)
 
-    # if it's binary, use numpy
-    if is_binary: triangle_generator = _read_binary
-    else: triangle_generator = _read_ascii
+    # read 3D triangles as (N, 3, 3) float64 array
+    reader = _read_binary if is_binary else _read_ascii
+    tris_3d = reader(stl_path)
 
-    # assemble stl
-    triangles = []
-    for i, t in enumerate(triangle_generator(stl_path)):
-        v1, v2, v3 = _project_triangle_to_plane(t, pvec)
-        verts = _munge_triangle(v1, v2, v3)
-        if len(verts) == 3: triangles.append(Polygon(verts))
-
-    return triangles
+    # project, filter, orient CCW, and construct shapely polygons in bulk
+    pts_2d = _project_triangle_to_plane(tris_3d, pvec)
+    verts_2d = _munge_triangle(pts_2d)
+    return shapely.polygons(verts_2d)
 
 
 def _calculate_projected_area(stl_paths, pvec, fheight):
@@ -224,7 +228,7 @@ def _calculate_projected_area(stl_paths, pvec, fheight):
         triangles = _load_stl(stl_file, pvec)
 
         # merge triangles into single polygon
-        sub_poly = unary_union(triangles)
+        sub_poly = shapely.union_all(triangles)
 
         # persist sub poly
         sub_polys.append(sub_poly)
@@ -232,7 +236,7 @@ def _calculate_projected_area(stl_paths, pvec, fheight):
     # clip using floor height if necessary
     if fheight:
         fheight = float(fheight)
-        p_proj = unary_union(sub_polys)
+        p_proj = shapely.union_all(sub_polys)
         u_min, v_min, u_max, v_max = p_proj.bounds
         p_floor = Polygon([
             (u_min-1, v_min-1),
@@ -242,7 +246,7 @@ def _calculate_projected_area(stl_paths, pvec, fheight):
         return p_proj.difference(p_floor).area
     
     # return just the projected area
-    else: return unary_union(sub_polys).area
+    else: return shapely.union_all(sub_polys).area
 
 
 #--- MAIN ---------------------------------------------------------------------+
