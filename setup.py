@@ -22,7 +22,8 @@ setup(
         'Operating System :: OS Independent'
     ],
     install_requires=[
-		'shapely'
+	'shapely',
+	'numpy'
     ],
     entry_points={
         'console_scripts': [

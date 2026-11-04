@@ -1,11 +1,20 @@
 import argparse
+import os
+import struct
 
+import numpy as np
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
 #--- constants ----------------------------------------------------------------+
 
 x, y = [0, 1]
+
+BINARY_STL_DTYPE = np.dtype([
+    ('normal', '<f4', (3,)),
+    ('vertices', '<f4', (3, 3)),
+    ('attr', '<u2'),
+])
 
 #--- functions ----------------------------------------------------------------+
 
@@ -35,7 +44,7 @@ def _area2(a, b, c):
 def _munge_triangle(v1, v2, v3, min_area=0):
     '''MUNGE TRIANGLE
     
-    For every new triangle that get's added, it  needs to pass some basic 
+    For every new triangle that gets added, it  needs to pass some basic 
     quality controls and if need be, fixed.
     
     1) Triangles with zero area are automatically rejected.
@@ -87,7 +96,7 @@ def _project_triangle_to_plane(tri_3d, vec):
     Parameters
     ----------
     tri_3d : list
-
+    
     Returns
     -------
     list
@@ -97,53 +106,143 @@ def _project_triangle_to_plane(tri_3d, vec):
     if vec == 'z': return [(v[0], v[1]) for v in tri_3d]
 
 
-def _bulk_load_stl(stl_path, vec):
-    '''BULK LOAD STL
+def _read_ascii(stl_path, n_tris=None):
     '''
+    '''
+
+    with open(stl_path, 'r') as stl_file:
+
+        # initialize
+        triangle = []
+        tblock = False
+
+        # cycle through stl line by line
+        for i, line in enumerate(stl_file.readlines()):
+
+            # begin triangle
+            if 'facet normal' in line: tblock = True
+            if 'vertex' in line and tblock==True: 
+                xyz = line.replace('vertex','').split()
+                x, y, z = float(xyz[0]), float(xyz[1]), float(xyz[2])
+                triangle.append([x, y, z])
+
+            # end triangle block
+            if 'endfacet' in line: 
+                yield triangle
+                triangle = []
+                tblock = False
+
+
+def _is_binary_stl(stl_path):
+    '''Check whether an STL file is binary or not.
+
+    Parameters
+    ----------
+    stl_path : str or os.PathLike
+
+    Returns
+    -------
+    bool
+    '''
+    file_size = os.path.getsize(stl_path)
+    if file_size < 84:
+        return False
+
+    with open(stl_path, 'rb') as f:
+        f.seek(80)
+        n_tris = struct.unpack('<I', f.read(4))[0]
+
+    return 84 + n_tris * 50 == file_size
+
+
+def _read_binary(stl_path, n_tris=None):
+    '''Read triangle vertices from a binary STL file.
+
+    Parameters
+    ----------
+    stl_path : str or os.PathLike
+    n_tris : int, optional
+
+    Returns
+    -------
+    numpy.ndarray
+        triangle vertices array with shape (n_tris, 3, 3) and dtype float64
+    '''
+    count = -1 if n_tris is None else int(n_tris)
+    data = np.fromfile(stl_path, dtype=BINARY_STL_DTYPE, count=count, offset=84)
+    return data['vertices'].astype(np.float64)
+
+
+def _load_stl(stl_path, pvec):
+    '''LOAD STL
+
+    Parameters
+    ----------
+    stl_path : str
+    pvec : str
+
+    Returns
+    -------
+    list of shapely polygon objects
+    '''
+
+    # first check if the file is binary
+    is_binary = _is_binary_stl(stl_path)
+
+    # if it's binary, use numpy
+    if is_binary: triangle_generator = _read_binary
+    else: triangle_generator = _read_ascii
+
+    # assemble stl
     triangles = []
-    for i, t in enumerate(_load_stl_generator(stl_path)):
-        v1, v2, v3 = _project_triangle_to_plane(t, vec)
+    for i, t in enumerate(triangle_generator(stl_path)):
+        v1, v2, v3 = _project_triangle_to_plane(t, pvec)
         verts = _munge_triangle(v1, v2, v3)
         if len(verts) == 3: triangles.append(Polygon(verts))
+
     return triangles
 
 
-def _load_stl_generator(stl_path):
+def _calculate_projected_area(stl_paths, pvec, fheight):
+    '''CALCULATE PROJECTED AREA
+
+    Parameters
+    ----------
+    stl_paths : list
+    pvec : str
+
+    Returns
+    -------
+    float
     '''
-    '''
-    with open(stl_path, 'r') as stl_file:
-        
-        # first, let's check if the file is ascii or binary
 
-        # cycle through stl line by line
-        for line in stl_file:
-            triangle = []
-            tblock = False
-            for i, line in enumerate(stl_file.readlines()):
+    # cycle through all stls
+    sub_polys = []
+    for stl_file in stl_paths:
 
-                # begin triangle
-                if 'facet normal' in line: tblock = True
-                if 'vertex' in line and tblock==True: 
-                    xyz = line.replace('vertex','').split()
-                    x, y, z = float(xyz[0]), float(xyz[1]), float(xyz[2])
-                    triangle.append([x, y, z])
+        # bulk load all triangles from stl
+        triangles = _load_stl(stl_file, pvec)
 
-                # end triangle block
-                if 'endfacet' in line: 
-                    yield triangle
-                    triangle = []
-                    tblock = False
+        # merge triangles into single polygon
+        sub_poly = unary_union(triangles)
 
+        # persist sub poly
+        sub_polys.append(sub_poly)
 
-def _calculate_projected_area(args):
-    # bulk load all triangles from stl
-    triangles = _bulk_load_stl(args.stl_path, args.vec)
-
-    # merge triangles into single polygon
-    main_poly = unary_union(triangles)
-
-    # return results
-    return main_poly.area
+    # clip using floor height if necessary
+    if fheight:
+        fheight = float(fheight)
+        p_proj = unary_union(sub_polys)
+        u_min, v_min, u_max, v_max = p_proj.bounds
+        p_floor = Polygon([
+            (u_min-1, v_min-1),
+            (u_max+1, v_min-1),
+            (u_max+1, fheight),
+            (u_min-1, fheight)])
+        return p_proj.difference(p_floor).area
+    
+    # return just the projected area
+    else: return unary_union(sub_polys).area
 
 
 #--- MAIN ---------------------------------------------------------------------+
@@ -152,32 +251,34 @@ def _calculate_projected_area(args):
 def main():
     # parse arguments
     parser = argparse.ArgumentParser(description='--- pArea ---')
-    parser.add_argument('-stl', dest='stl_path', type=str, required=True, help='specify the path to the stl')
+    parser.add_argument('-stl', nargs='+', dest='stl_paths', type=str, required=True, help='specify the path to the stl')
+    parser.add_argument('-floor', dest='fheight', type=str, required=False, help='specify the floor height. everything below will be clipped.')
 
     # vectors
-    parser.add_argument('-x', dest='vec', required=False, action='store_const', const='x')
-    parser.add_argument('-y', dest='vec', required=False, action='store_const', const='y')
-    parser.add_argument('-z', dest='vec', required=False, action='store_const', const='z')
+    parser.add_argument('-x', dest='pvec', required=False, action='store_const', const='x')
+    parser.add_argument('-y', dest='pvec', required=False, action='store_const', const='y')
+    parser.add_argument('-z', dest='pvec', required=False, action='store_const', const='z')
 
     # planes
-    parser.add_argument('-xy', dest='vec', required=False, action='store_const', const='z')
-    parser.add_argument('-yz', dest='vec', required=False, action='store_const', const='x')
-    parser.add_argument('-zx', dest='vec', required=False, action='store_const', const='y')
+    parser.add_argument('-xy', dest='pvec', required=False, action='store_const', const='z')
+    parser.add_argument('-yz', dest='pvec', required=False, action='store_const', const='x')
+    parser.add_argument('-zx', dest='pvec', required=False, action='store_const', const='y')
 
     # more planes
-    parser.add_argument('-yx', dest='vec', required=False, action='store_const', const='z')
-    parser.add_argument('-zy', dest='vec', required=False, action='store_const', const='x')
-    parser.add_argument('-xz', dest='vec', required=False, action='store_const', const='y')
+    parser.add_argument('-yx', dest='pvec', required=False, action='store_const', const='z')
+    parser.add_argument('-zy', dest='pvec', required=False, action='store_const', const='x')
+    parser.add_argument('-xz', dest='pvec', required=False, action='store_const', const='y')
 
     args = parser.parse_args()
 
     # basic checks
-    if args.stl_path is None: print('ERROR: must specify an stl path')
+    if args.stl_paths is None: print('ERROR: must specify an stl path')
 
     # calculate projected area
-    p_area = _calculate_projected_area(args)
+    p_area = _calculate_projected_area(args.stl_paths, args.pvec, args.fheight)
 
     # display results
+    if args.fheight: print('>   floor height:', args.fheight)
     print(f'> projected area: {p_area}')
 
 
