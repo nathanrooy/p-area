@@ -1,5 +1,6 @@
-from .__about__ import __version__
-from .__about__ import __author__
-from .main import main
+from __future__ import annotations
 
-__all__ = ["__version__", "__author__", "main"]
+from parea.__about__ import __author__, __version__
+from parea.main import main
+
+__all__ = ["__author__", "__version__", "main"]

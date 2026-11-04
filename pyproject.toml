@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "parea"
+dynamic = ["version"]
+description = "The easiest way to calculate the projected/frontal area of an STL."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [
+    { name = "Nathan A. Rooy", email = "nathanrooy@gmail.com" },
+]
+keywords = [
+    "aerodynamics",
+    "cad",
+    "cfd",
+    "computational-geometry",
+    "frontal-area",
+    "projected-area",
+    "stl",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "numpy>=1.24",
+    "shapely>=2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/nathanrooy/p-area"
+Repository = "https://github.com/nathanrooy/p-area"
+Issues = "https://github.com/nathanrooy/p-area/issues"
+
+[project.scripts]
+parea = "parea:main"
+
+[tool.setuptools.packages.find]
+include = ["parea*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "parea.__about__.__version__" }
